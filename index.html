@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Weekly Focus Planner</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg: #0d1117; --surface: #161b22; --surface2: #1c2330;
+    --border: #30363d; --border2: #21262d;
+    --text: #e6edf3; --text-muted: #7d8590; --text-dim: #484f58;
+    --green: #3fb950; --green-dim: #1a3a20;
+    --yellow: #d29922; --yellow-dim: #2d2209;
+    --blue: #58a6ff; --blue-dim: #0c2040;
+    --red: #f85149; --red-dim: #3a0f0e;
+    --purple: #bc8cff; --purple-dim: #1e1040;
+    --orange: #e3b341;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; line-height: 1.5; min-height: 100vh; }
+
+  /* ── AUTH SCREEN ── */
+  #authScreen {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at 30% 40%, #0c2040 0%, var(--bg) 60%);
+  }
+  .auth-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 40px; width: 360px; text-align: center;
+  }
+  .auth-logo { font-family: var(--mono); font-size: 12px; color: var(--blue); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
+  .auth-title { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+  .auth-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 28px; }
+  .auth-input {
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); border-radius: 6px; padding: 10px 12px;
+    font-family: var(--sans); font-size: 14px; outline: none; margin-bottom: 10px;
+    transition: border-color 0.15s;
+  }
+  .auth-input:focus { border-color: var(--blue); }
+  .auth-btn {
+    width: 100%; padding: 10px; background: var(--blue); color: #000;
+    border: none; border-radius: 6px; font-weight: 600; font-size: 14px;
+    cursor: pointer; transition: background 0.15s; margin-bottom: 8px;
+  }
+  .auth-btn:hover { background: #79baff; }
+  .auth-err { font-size: 12px; color: var(--red); margin-top: 6px; min-height: 18px; }
+  .auth-toggle { font-size: 12px; color: var(--text-muted); margin-top: 10px; cursor: pointer; }
+  .auth-toggle span { color: var(--blue); }
+
+  /* ── APP SHELL ── */
+  #appShell { display: none; flex-direction: column; min-height: 100vh; }
+
+  /* ── HEADER ── */
+  .header {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 12px 20px; display: flex; align-items: center;
+    justify-content: space-between; position: sticky; top: 0; z-index: 100;
+  }
+  .header-left { display: flex; align-items: center; gap: 16px; }
+  .logo { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--blue); letter-spacing: 0.04em; text-transform: uppercase; }
+  .week-nav { display: flex; align-items: center; gap: 8px; }
+  .week-nav button {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted);
+    padding: 4px 10px; border-radius: 4px; cursor: pointer;
+    font-family: var(--mono); font-size: 12px; transition: all 0.15s;
+  }
+  .week-nav button:hover { border-color: var(--blue); color: var(--blue); }
+  .week-label { font-family: var(--mono); font-size: 13px; color: var(--text); min-width: 200px; text-align: center; }
+  .header-right { display: flex; gap: 8px; align-items: center; }
+  .user-chip { font-size: 12px; color: var(--text-muted); font-family: var(--mono); }
+  .btn { padding: 6px 13px; border-radius: 5px; font-family: var(--sans); font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid; transition: all 0.15s; }
+  .btn-ghost { background: transparent; border-color: var(--border); color: var(--text-muted); }
+  .btn-ghost:hover { border-color: var(--blue); color: var(--blue); background: var(--blue-dim); }
+  .btn-primary { background: var(--blue); border-color: var(--blue); color: #000; font-weight: 600; }
+  .btn-primary:hover { background: #79baff; }
+
+  /* ── BODY LAYOUT ── */
+  .app-body { display: grid; grid-template-columns: 210px 1fr 260px; min-height: calc(100vh - 53px); }
+
+  /* ── SIDEBAR ── */
+  .sidebar { background: var(--surface); border-right: 1px solid var(--border); padding: 16px 0; }
+  .sidebar-section { margin-bottom: 20px; }
+  .sidebar-label { font-family: var(--mono); font-size: 10px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; padding: 0 16px 8px; }
+  .priority-item { display: flex; align-items: center; gap: 10px; padding: 7px 16px; cursor: pointer; transition: background 0.1s; border-left: 3px solid transparent; font-size: 13px; color: var(--text-muted); }
+  .priority-item:hover { background: var(--surface2); }
+  .priority-item.active { background: var(--surface2); border-left-color: var(--blue); color: var(--text); }
+  .priority-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .stats-grid { padding: 0 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat-box { background: var(--surface2); border: 1px solid var(--border2); border-radius: 6px; padding: 10px; text-align: center; }
+  .stat-num { font-family: var(--mono); font-size: 20px; font-weight: 600; }
+  .stat-lbl { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
+  .stat-green .stat-num { color: var(--green); }
+  .stat-yellow .stat-num { color: var(--yellow); }
+  .stat-blue .stat-num { color: var(--blue); }
+  .stat-red .stat-num { color: var(--red); }
+  .progress-wrap { padding: 0 16px; }
+  .progress-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .progress-label { font-size: 11px; color: var(--text-muted); width: 80px; text-align: right; flex-shrink: 0; }
+  .progress-track { flex: 1; height: 5px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+  .fill-green { background: var(--green); } .fill-blue { background: var(--blue); }
+  .fill-yellow { background: var(--yellow); } .fill-purple { background: var(--purple); }
+  .progress-pct { font-family: var(--mono); font-size: 10px; color: var(--text-dim); width: 28px; text-align: right; }
+
+  /* ── CONTENT ── */
+  .content { padding: 18px 20px; overflow-y: auto; }
+  .rule-banner { background: var(--surface2); border: 1px solid var(--border2); border-left: 3px solid var(--orange); border-radius: 6px; padding: 9px 14px; margin-bottom: 14px; font-size: 12px; color: var(--text-muted); font-style: italic; }
+  .focus-bar { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 14px; }
+  .focus-bar-label { font-family: var(--mono); font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
+  .focus-pills { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
+  .focus-pill { font-size: 12px; padding: 2px 9px; border-radius: 20px; border: 1px solid; font-weight: 500; }
+  .columns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .col-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .col-header { padding: 11px 14px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+  .col-title-wrap { display: flex; align-items: center; gap: 8px; }
+  .col-title { font-weight: 600; font-size: 13px; }
+  .col-badge { font-family: var(--mono); font-size: 10px; padding: 2px 7px; border-radius: 12px; border: 1px solid; font-weight: 600; }
+  .badge-primary { color: var(--blue); border-color: var(--blue); background: var(--blue-dim); }
+  .badge-secondary { color: var(--yellow); border-color: var(--yellow); background: var(--yellow-dim); }
+  .badge-watch { color: var(--text-muted); border-color: var(--border); background: var(--surface2); }
+  .col-add-btn { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 18px; padding: 2px 5px; border-radius: 4px; transition: color 0.15s; }
+  .col-add-btn:hover { color: var(--blue); }
+  .col-body { padding: 10px; min-height: 180px; }
+  .task-item { background: var(--surface2); border: 1px solid var(--border2); border-radius: 6px; padding: 9px 11px; margin-bottom: 7px; transition: border-color 0.15s; }
+  .task-item:hover { border-color: var(--border); }
+  .task-item.done { opacity: 0.5; }
+  .task-item.done .task-title { text-decoration: line-through; color: var(--text-muted); }
+  .task-header { display: flex; align-items: flex-start; gap: 8px; }
+  .task-check { width: 15px; height: 15px; border: 2px solid var(--border); border-radius: 3px; flex-shrink: 0; margin-top: 2px; display: flex; align-items: center; justify-content: center; cursor: pointer; background: transparent; transition: all 0.15s; }
+  .task-check.checked { background: var(--green); border-color: var(--green); }
+  .task-check.checked::after { content: '✓'; font-size: 9px; color: #000; font-weight: 700; }
+  .task-title { font-size: 13px; flex: 1; }
+  .task-actions { display: flex; gap: 3px; opacity: 0; transition: opacity 0.15s; }
+  .task-item:hover .task-actions { opacity: 1; }
+  .task-action-btn { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 12px; padding: 2px 5px; border-radius: 3px; transition: all 0.12s; }
+  .task-action-btn:hover { background: var(--surface); color: var(--text); }
+  .task-action-btn.del:hover { color: var(--red); }
+  .task-meta { display: flex; align-items: center; gap: 6px; margin-top: 5px; padding-left: 23px; }
+  .task-tag { font-size: 10px; padding: 1px 6px; border-radius: 10px; border: 1px solid; font-weight: 500; }
+  .tag-blocker { color: var(--red); border-color: var(--red); background: var(--red-dim); }
+  .tag-inflight { color: var(--blue); border-color: var(--blue); background: var(--blue-dim); }
+  .tag-done { color: var(--green); border-color: var(--green); background: var(--green-dim); }
+  .tag-waiting { color: var(--yellow); border-color: var(--yellow); background: var(--yellow-dim); }
+  .task-note { font-size: 11px; color: var(--text-muted); margin-top: 3px; padding-left: 23px; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+  .mini-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .mini-header { padding: 9px 13px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .mini-title { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
+  .mini-body { padding: 8px; }
+  .mini-item { padding: 6px 9px; border-radius: 5px; border: 1px solid var(--border2); background: var(--surface2); margin-bottom: 5px; font-size: 12px; display: flex; align-items: center; gap: 7px; }
+  .mini-item-del { background: none; border: none; color: var(--text-dim); cursor: pointer; opacity: 0; transition: opacity 0.12s; font-size: 13px; margin-left: auto; }
+  .mini-item:hover .mini-item-del { opacity: 1; }
+  .mini-item-del:hover { color: var(--red); }
+  .empty-state { text-align: center; padding: 20px 12px; color: var(--text-dim); font-size: 12px; }
+
+  /* ── FINANCE PANEL ── */
+  .finance-panel { background: var(--surface); border-left: 1px solid var(--border); padding: 16px; overflow-y: auto; }
+  .fin-section { margin-bottom: 18px; }
+  .fin-label { font-family: var(--mono); font-size: 10px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
+  .fin-summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+  .fin-box { background: var(--surface2); border: 1px solid var(--border2); border-radius: 6px; padding: 9px; text-align: center; }
+  .fin-box-num { font-family: var(--mono); font-size: 16px; font-weight: 600; }
+  .fin-box-lbl { font-size: 10px; color: var(--text-dim); margin-top: 2px; }
+  .fin-green { color: var(--green); }
+  .fin-red { color: var(--red); }
+  .fin-yellow { color: var(--yellow); }
+  .fin-blue { color: var(--blue); }
+  .bill-list { display: flex; flex-direction: column; gap: 5px; }
+  .bill-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 9px; background: var(--surface2); border: 1px solid var(--border2); border-radius: 5px; font-size: 12px; }
+  .bill-name { flex: 1; color: var(--text-muted); }
+  .bill-amt { font-family: var(--mono); font-size: 11px; color: var(--text); margin-left: 8px; }
+  .bill-due { font-family: var(--mono); font-size: 10px; color: var(--text-dim); margin-left: 6px; }
+  .bill-paid-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-left: 6px; }
+  .dot-paid { background: var(--green); }
+  .dot-unpaid { background: var(--red); }
+  .fin-divider { border: none; border-top: 1px solid var(--border2); margin: 12px 0; }
+  .vac-bar-wrap { margin-top: 8px; }
+  .vac-bar-track { width: 100%; height: 8px; background: var(--surface2); border-radius: 4px; overflow: hidden; margin: 5px 0; }
+  .vac-bar-fill { height: 100%; background: var(--purple); border-radius: 4px; transition: width 0.6s ease; }
+  .vac-meta { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10px; color: var(--text-dim); }
+  .fin-loading { font-size: 12px; color: var(--text-dim); text-align: center; padding: 20px 0; }
+
+  /* ── MODAL ── */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; width: 480px; max-width: 95vw; max-height: 85vh; overflow-y: auto; transform: translateY(10px); transition: transform 0.2s; }
+  .modal-overlay.open .modal { transform: translateY(0); }
+  .modal-header { padding: 15px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .modal-title { font-size: 15px; font-weight: 600; }
+  .modal-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 18px; }
+  .modal-body { padding: 18px; }
+  .form-group { margin-bottom: 13px; }
+  .form-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px; display: block; }
+  .form-input, .form-select, .form-textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 5px; padding: 8px 10px; font-family: var(--sans); font-size: 13px; outline: none; transition: border-color 0.15s; }
+  .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--blue); }
+  .form-textarea { resize: vertical; min-height: 65px; }
+  .form-select option { background: var(--surface); }
+  .modal-footer { padding: 11px 18px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+  .import-hint { font-size: 12px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.6; background: var(--surface2); border-radius: 6px; padding: 10px 12px; border-left: 3px solid var(--blue); }
+
+  /* ── TOAST ── */
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 18px; font-size: 13px; color: var(--text); z-index: 9999; transform: translateY(20px); opacity: 0; transition: all 0.25s; pointer-events: none; }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.success { border-color: var(--green); }
+  .toast.error { border-color: var(--red); }
+
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- AUTH SCREEN -->
+<div id="authScreen">
+  <div class="auth-box">
+    <div class="auth-logo">⬛ Weekly Planner</div>
+    <div class="auth-title" id="authTitle">Sign In</div>
+    <div class="auth-sub" id="authSub">homebasefinances workspace</div>
+    <input class="auth-input" id="authEmail" type="email" placeholder="Email address" onkeydown="if(event.key==='Enter')authSubmit()">
+    <input class="auth-input" id="authPassword" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')authSubmit()">
+    <div id="authNameWrap" style="display:none">
+      <input class="auth-input" id="authName" type="text" placeholder="Display name">
+    </div>
+    <button class="auth-btn" onclick="authSubmit()" id="authBtn">Sign In</button>
+    <div class="auth-err" id="authErr"></div>
+    <div class="auth-toggle" onclick="toggleAuthMode()">No account? <span id="authToggleText">Create one</span></div>
+    <div class="auth-toggle" id="forgotLink" onclick="forgotPassword()" style="margin-top:6px">Forgot password? <span>Reset it</span></div>
+    <div id="resetMsg" style="font-size:12px;color:var(--green);margin-top:8px;min-height:18px;display:none"></div>
+  </div>
+</div>
+
+<!-- APP SHELL -->
+<div id="appShell">
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-left">
+      <div class="logo">⬛ Weekly Planner</div>
+      <div class="week-nav">
+        <button onclick="changeWeek(-1)">‹ Prev</button>
+        <div class="week-label" id="weekLabel">Week of …</div>
+        <button onclick="changeWeek(1)">Next ›</button>
+      </div>
+    </div>
+    <div class="header-right">
+      <span class="user-chip" id="userChip"></span>
+      <button class="btn btn-ghost" onclick="openImportModal()">⬇ Import Copilot</button>
+      <button class="btn btn-ghost" onclick="copyWeekForward()">⧉ Copy Week</button>
+      <button class="btn btn-primary" onclick="openAddTask()">+ Task</button>
+      <button class="btn btn-ghost" onclick="signOut()">Sign out</button>
+    </div>
+  </div>
+
+  <!-- BODY -->
+  <div class="app-body">
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-label">Filter</div>
+        <div class="priority-item active" onclick="setFilter('all',this)"><div class="priority-dot" style="background:#7d8590"></div>All Tasks</div>
+        <div class="priority-item" onclick="setFilter('ETF/R',this)"><div class="priority-dot" style="background:#58a6ff"></div>ETF/R</div>
+        <div class="priority-item" onclick="setFilter('Control-M',this)"><div class="priority-dot" style="background:#3fb950"></div>Control-M</div>
+        <div class="priority-item" onclick="setFilter('Macro4',this)"><div class="priority-dot" style="background:#d29922"></div>Macro4</div>
+        <div class="priority-item" onclick="setFilter('Learning',this)"><div class="priority-dot" style="background:#bc8cff"></div>Learning</div>
+        <div class="priority-item" onclick="setFilter('Other',this)"><div class="priority-dot" style="background:#7d8590"></div>Other</div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-label">This Week</div>
+        <div class="stats-grid">
+          <div class="stat-box stat-green"><div class="stat-num" id="statDone">0</div><div class="stat-lbl">Done</div></div>
+          <div class="stat-box stat-blue"><div class="stat-num" id="statFlight">0</div><div class="stat-lbl">In Flight</div></div>
+          <div class="stat-box stat-yellow"><div class="stat-num" id="statWaiting">0</div><div class="stat-lbl">Waiting</div></div>
+          <div class="stat-box stat-red"><div class="stat-num" id="statBlock">0</div><div class="stat-lbl">Blocked</div></div>
+        </div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-label">Progress</div>
+        <div class="progress-wrap" id="progressBars"></div>
+      </div>
+    </div>
+
+    <!-- CONTENT -->
+    <div class="content">
+      <div class="rule-banner">Focus Rule: <strong>Finish &gt; Start.</strong> If it feels risky or complicated → don't change it unless required.</div>
+      <div class="focus-bar">
+        <div class="focus-bar-label">Focus</div>
+        <div class="focus-pills" id="focusPills"></div>
+        <button class="btn btn-ghost" style="font-size:11px" onclick="editFocus()">Edit</button>
+      </div>
+      <div class="columns">
+        <div class="col-card">
+          <div class="col-header"><div class="col-title-wrap"><div class="col-title">Primary</div><div class="col-badge badge-primary">Must Do</div></div><button class="col-add-btn" onclick="openAddTask('primary')">+</button></div>
+          <div class="col-body" id="col-primary"></div>
+        </div>
+        <div class="col-card">
+          <div class="col-header"><div class="col-title-wrap"><div class="col-title">Secondary</div><div class="col-badge badge-secondary">When Free</div></div><button class="col-add-btn" onclick="openAddTask('secondary')">+</button></div>
+          <div class="col-body" id="col-secondary"></div>
+        </div>
+        <div class="col-card">
+          <div class="col-header"><div class="col-title-wrap"><div class="col-title">Monitor / Learn</div><div class="col-badge badge-watch">Background</div></div><button class="col-add-btn" onclick="openAddTask('monitor')">+</button></div>
+          <div class="col-body" id="col-monitor"></div>
+        </div>
+      </div>
+      <div class="two-col">
+        <div class="mini-card">
+          <div class="mini-header"><div class="mini-title">🏆 Wins</div><button class="btn btn-ghost" style="font-size:11px;padding:3px 8px" onclick="addWin()">+ Win</button></div>
+          <div class="mini-body" id="winsBody"></div>
+        </div>
+        <div class="mini-card">
+          <div class="mini-header"><div class="mini-title">🚧 Blockers</div><button class="btn btn-ghost" style="font-size:11px;padding:3px 8px" onclick="addBlocker()">+ Blocker</button></div>
+          <div class="mini-body" id="blockersBody"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FINANCE PANEL -->
+    <div class="finance-panel">
+      <div class="fin-loading" id="finLoading">Loading finances…</div>
+      <div id="finContent" style="display:none">
+        <div class="fin-section">
+          <div class="fin-label">Pay Period Overview</div>
+          <div class="fin-summary-grid">
+            <div class="fin-box"><div class="fin-box-num fin-blue" id="finNetPay">—</div><div class="fin-box-lbl">Net Pay</div></div>
+            <div class="fin-box"><div class="fin-box-num fin-red" id="finTotalBills">—</div><div class="fin-box-lbl">Monthly Bills</div></div>
+            <div class="fin-box"><div class="fin-box-num fin-yellow" id="finUnpaid">—</div><div class="fin-box-lbl">Unpaid</div></div>
+            <div class="fin-box"><div class="fin-box-num fin-green" id="finPaid">—</div><div class="fin-box-lbl">Paid</div></div>
+          </div>
+        </div>
+        <hr class="fin-divider">
+        <div class="fin-section">
+          <div class="fin-label">Upcoming Bills (next 14 days)</div>
+          <div class="bill-list" id="billList"></div>
+        </div>
+        <hr class="fin-divider">
+        <div class="fin-section">
+          <div class="fin-label">Vacation Fund</div>
+          <div class="vac-bar-wrap">
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted)">
+              <span id="vacPaid">$0 saved</span><span id="vacGoal">Goal: $0</span>
+            </div>
+            <div class="vac-bar-track"><div class="vac-bar-fill" id="vacBar" style="width:0%"></div></div>
+            <div class="vac-meta"><span id="vacPct">0%</span><span id="vacRemaining">$0 to go</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TASK MODAL -->
+<div class="modal-overlay" id="taskModal">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title" id="taskModalTitle">Add Task</div><button class="modal-close" onclick="closeModal('taskModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Title</label><input class="form-input" id="taskTitle" placeholder="e.g. Complete ETF/R install steps 16–20"></div>
+      <div class="form-group"><label class="form-label">Note</label><textarea class="form-textarea" id="taskNote" placeholder="Context, steps, links…"></textarea></div>
+      <div class="form-group"><label class="form-label">Column</label>
+        <select class="form-select" id="taskColumn">
+          <option value="primary">Primary (Must Do)</option>
+          <option value="secondary">Secondary (When Free)</option>
+          <option value="monitor">Monitor / Learn</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Focus Area</label>
+        <select class="form-select" id="taskFocus">
+          <option value="ETF/R">ETF/R</option><option value="Control-M">Control-M</option>
+          <option value="Macro4">Macro4</option><option value="Learning">Learning</option><option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Status</label>
+        <select class="form-select" id="taskStatus">
+          <option value="inflight">In Flight</option><option value="waiting">Waiting</option>
+          <option value="blocker">Blocker</option><option value="done">Done</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('taskModal')">Cancel</button><button class="btn btn-primary" onclick="saveTask()">Save Task</button></div>
+  </div>
+</div>
+
+<!-- IMPORT MODAL -->
+<div class="modal-overlay" id="importModal">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">Import Plan from Copilot</div><button class="modal-close" onclick="closeModal('importModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="import-hint">Paste your Copilot plan below. Lines starting with bullets or numbers will be parsed as tasks. Auto-assigns focus area based on keywords (ETF/R, Macro4, Control-M, etc.).</div>
+      <div class="form-group"><label class="form-label">Paste Copilot Output</label><textarea class="form-textarea" id="importText" style="min-height:130px" placeholder="• Finish ETF/R install steps 16+&#10;• Validate startup/shutdown behavior&#10;• Migrate Macro4 members…"></textarea></div>
+      <div id="importPreview" style="display:none">
+        <div class="form-label" style="margin-bottom:8px">Preview — click row to toggle include</div>
+        <div id="importItems"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="importParseBtn" onclick="parseImport()">Parse →</button>
+      <button class="btn btn-primary" id="importConfirmBtn" style="display:none" onclick="confirmImport()">Add to Week</button>
+      <button class="btn btn-ghost" onclick="closeModal('importModal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- FOCUS MODAL -->
+<div class="modal-overlay" id="focusModal">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">Edit Week Focus</div><button class="modal-close" onclick="closeModal('focusModal')">✕</button></div>
+    <div class="modal-body"><div class="form-group"><label class="form-label">Focus items (comma-separated)</label><input class="form-input" id="focusInput" placeholder="ETF/R Install, Macro4 Migration, Control-M Watch"></div></div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('focusModal')">Cancel</button><button class="btn btn-primary" onclick="saveFocus()">Save</button></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── SUPABASE INIT ──────────────────────────────────────────────────────
+const SUPA_URL = 'https://yiawbwwbhwdsqymjtrfu.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlpYXdid3diaHdkc3F5bWp0cmZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0NDYzMTQsImV4cCI6MjA5NTAyMjMxNH0._BAsgYTxjKFDaVQAM-6Ozp2fzA1IsvyFcjuS7Laj-3U';
+const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+let currentUser = null;
+let workspaceId = null;
+let currentWeekStart = getMondayOf(new Date());
+let activeFilter = 'all';
+let editingTaskId = null;
+let importParsed = [];
+
+// ── AUTH ───────────────────────────────────────────────────────────────
+let isSignUp = false;
+function toggleAuthMode() {
+  isSignUp = !isSignUp;
+  document.getElementById("authTitle").textContent = isSignUp ? "Create Account" : "Sign In";
+  document.getElementById("authBtn").textContent = isSignUp ? "Create Account" : "Sign In";
+  document.getElementById("authToggleText").textContent = isSignUp ? "Sign in instead" : "Create one";
+  document.getElementById("authNameWrap").style.display = isSignUp ? "" : "none";
+  document.getElementById("authErr").textContent = "";
+  document.getElementById("forgotLink").style.display = isSignUp ? "none" : "";
+  document.getElementById("resetMsg").style.display = "none";
+}
+
+async function forgotPassword() {
+  const email = document.getElementById("authEmail").value.trim();
+  document.getElementById("authErr").textContent = "";
+  document.getElementById("resetMsg").style.display = "none";
+  if (!email) {
+    document.getElementById("authErr").textContent = "Enter your email above first.";
+    document.getElementById("authEmail").focus();
+    return;
+  }
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.href
+  });
+  if (error) {
+    document.getElementById("authErr").textContent = error.message;
+  } else {
+    const el = document.getElementById("resetMsg");
+    el.textContent = "Reset link sent to " + email + " — check your inbox.";
+    el.style.display = "block";
+  }
+}
+
+async function authSubmit() {
+  const email = document.getElementById('authEmail').value.trim();
+  const pass = document.getElementById('authPassword').value;
+  const errEl = document.getElementById('authErr');
+  const btn = document.getElementById('authBtn');
+  errEl.textContent = '';
+  if (!email || !pass) { errEl.textContent = 'Email and password required.'; return; }
+  btn.textContent = 'Signing in…';
+  btn.disabled = true;
+  if (isSignUp) {
+    const { error } = await sb.auth.signUp({ email, password: pass });
+    btn.textContent = 'Create Account'; btn.disabled = false;
+    if (error) { errEl.textContent = error.message; return; }
+    errEl.textContent = 'Check your email to confirm, then sign in.';
+  } else {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+    btn.textContent = 'Sign In'; btn.disabled = false;
+    if (error) { errEl.textContent = error.message; return; }
+    // Manually trigger app load in case onAuthStateChange is slow
+    if (data?.session?.user) await bootApp(data.session.user);
+  }
+}
+
+async function bootApp(user) {
+  currentUser = user;
+  const errEl = document.getElementById('authErr');
+  const btn = document.getElementById('authBtn');
+  try {
+    await loadWorkspace();
+  } catch(e) {
+    btn.disabled = false; btn.textContent = 'Sign In';
+    errEl.textContent = 'Workspace load failed: ' + e.message;
+    return;
+  }
+  if (!workspaceId) {
+    btn.disabled = false; btn.textContent = 'Sign In';
+    errEl.textContent = 'No workspace found for this account. Make sure you are using the correct email.';
+    return;
+  }
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('appShell').style.display = 'flex';
+  document.getElementById('userChip').textContent = currentUser.email;
+  render();
+  loadFinances();
+}
+
+async function signOut() {
+  await sb.auth.signOut();
+  workspaceId = null; currentUser = null;
+  document.getElementById('appShell').style.display = 'none';
+  document.getElementById('authScreen').style.display = 'flex';
+}
+
+sb.auth.onAuthStateChange(async (event, session) => {
+  if (event === 'SIGNED_IN' && session?.user && !workspaceId) {
+    await bootApp(session.user);
+  }
+});
+
+// Handle existing session on page load
+sb.auth.getSession().then(async ({ data: { session } }) => {
+  if (session?.user) {
+    await bootApp(session.user);
+  } else {
+    document.getElementById('authScreen').style.display = 'flex';
+  }
+});
+
+async function loadWorkspace() {
+  // Query all workspace memberships for this user, prefer owner role
+  const { data, error } = await sb.from('workspace_members')
+    .select('workspace_id, role')
+    .eq('user_id', currentUser.id);
+  if (error) throw new Error('workspace_members query failed: ' + error.message);
+  if (data && data.length > 0) {
+    // Prefer owned workspace, fall back to first available
+    const owned = data.find(r => r.role === 'owner');
+    workspaceId = (owned || data[0]).workspace_id;
+  } else {
+    // Last resort: check workspaces table directly by owner_id
+    const { data: ws, error: wsErr } = await sb.from('workspaces')
+      .select('id')
+      .eq('owner_id', currentUser.id)
+      .limit(1);
+    if (wsErr) throw new Error('workspaces query failed: ' + wsErr.message);
+    if (ws && ws.length > 0) workspaceId = ws[0].id;
+  }
+}
+
+// ── DATE HELPERS ───────────────────────────────────────────────────────
+function getMondayOf(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  d.setDate(diff);
+  return d.toISOString().split('T')[0];
+}
+function weekLabel(start) {
+  const s = new Date(start + 'T00:00:00');
+  const e = new Date(s); e.setDate(e.getDate() + 6);
+  const f = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return `Week of ${f(s)} – ${f(e)}`;
+}
+function changeWeek(dir) {
+  const d = new Date(currentWeekStart + 'T00:00:00');
+  d.setDate(d.getDate() + dir * 7);
+  currentWeekStart = getMondayOf(d);
+  render();
+}
+
+// ── RENDER ─────────────────────────────────────────────────────────────
+async function render() {
+  if (!workspaceId) return;
+  document.getElementById('weekLabel').textContent = weekLabel(currentWeekStart);
+
+  const [tasksRes, winsRes, blockersRes, weekRes] = await Promise.all([
+    sb.from('planner_tasks').select('*').eq('workspace_id', workspaceId).eq('week_start', currentWeekStart).order('sort_order'),
+    sb.from('planner_wins').select('*').eq('workspace_id', workspaceId).eq('week_start', currentWeekStart).order('created_at'),
+    sb.from('planner_blockers').select('*').eq('workspace_id', workspaceId).eq('week_start', currentWeekStart).order('created_at'),
+    sb.from('planner_weeks').select('*').eq('workspace_id', workspaceId).eq('week_start', currentWeekStart).single()
+  ]);
+
+  const tasks = tasksRes.data || [];
+  const wins = winsRes.data || [];
+  const blockers = blockersRes.data || [];
+  const weekData = weekRes.data;
+  const focus = weekData?.focus || ['ETF/R', 'Macro4', 'Control-M Watch'];
+
+  // Focus pills
+  const focusColors = { 'ETF/R': '#58a6ff', 'Control-M': '#3fb950', 'Macro4': '#d29922', 'Learning': '#bc8cff' };
+  document.getElementById('focusPills').innerHTML = focus.map(f => {
+    const c = focusColors[f] || '#7d8590';
+    return `<div class="focus-pill" style="color:${c};border-color:${c};background:${c}18">${esc(f)}</div>`;
+  }).join('');
+
+  // Columns
+  const filtered = activeFilter === 'all' ? tasks : tasks.filter(t => t.focus_area === activeFilter);
+  ['primary','secondary','monitor'].forEach(col => {
+    const el = document.getElementById('col-' + col);
+    const items = filtered.filter(t => t.column_name === col);
+    el.innerHTML = items.length === 0
+      ? '<div class="empty-state">No tasks yet</div>'
+      : items.map(renderTask).join('');
+  });
+
+  // Stats
+  document.getElementById('statDone').textContent = tasks.filter(t => t.status === 'done').length;
+  document.getElementById('statFlight').textContent = tasks.filter(t => t.status === 'inflight').length;
+  document.getElementById('statWaiting').textContent = tasks.filter(t => t.status === 'waiting').length;
+  document.getElementById('statBlock').textContent = tasks.filter(t => t.status === 'blocker').length;
+
+  // Progress bars
+  const focuses = ['ETF/R','Control-M','Macro4','Learning'];
+  const colors = { 'ETF/R':'fill-blue','Control-M':'fill-green','Macro4':'fill-yellow','Learning':'fill-purple' };
+  document.getElementById('progressBars').innerHTML = focuses.map(f => {
+    const ft = tasks.filter(t => t.focus_area === f);
+    const pct = ft.length === 0 ? 0 : Math.round((ft.filter(t=>t.status==='done').length / ft.length) * 100);
+    return `<div class="progress-row"><div class="progress-label">${f}</div><div class="progress-track"><div class="progress-fill ${colors[f]}" style="width:${pct}%"></div></div><div class="progress-pct">${pct}%</div></div>`;
+  }).join('');
+
+  // Wins
+  document.getElementById('winsBody').innerHTML = wins.length === 0
+    ? '<div class="empty-state">No wins logged yet</div>'
+    : wins.map(w => `<div class="mini-item"><span>⭐</span><span style="flex:1">${esc(w.text)}</span><button class="mini-item-del" onclick="deleteWin('${w.id}')">✕</button></div>`).join('');
+
+  // Blockers
+  document.getElementById('blockersBody').innerHTML = blockers.length === 0
+    ? '<div class="empty-state">No blockers logged</div>'
+    : blockers.map(b => `<div class="mini-item"><span>🚧</span><span style="flex:1">${esc(b.text)}</span><button class="mini-item-del" onclick="deleteBlocker('${b.id}')">✕</button></div>`).join('');
+}
+
+function renderTask(t) {
+  const tagMap = { blocker:'tag-blocker', inflight:'tag-inflight', done:'tag-done', waiting:'tag-waiting' };
+  const statusLabel = { blocker:'Blocker', inflight:'In Flight', done:'Done', waiting:'Waiting' };
+  return `<div class="task-item ${t.status==='done'?'done':''}">
+    <div class="task-header">
+      <div class="task-check ${t.status==='done'?'checked':''}" onclick="toggleDone('${t.id}','${t.status}')"></div>
+      <div class="task-title">${esc(t.title)}</div>
+      <div class="task-actions">
+        <button class="task-action-btn" onclick="openEditTask('${t.id}')">✎</button>
+        <button class="task-action-btn del" onclick="deleteTask('${t.id}')">✕</button>
+      </div>
+    </div>
+    ${t.note ? `<div class="task-note">${esc(t.note)}</div>` : ''}
+    <div class="task-meta">
+      <span class="task-tag ${tagMap[t.status]}">${statusLabel[t.status]}</span>
+      <span class="task-tag" style="color:#7d8590;border-color:#30363d;background:#1c2330">${esc(t.focus_area)}</span>
+    </div>
+  </div>`;
+}
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── FILTER ─────────────────────────────────────────────────────────────
+function setFilter(f, el) {
+  activeFilter = f;
+  document.querySelectorAll('.priority-item').forEach(x => x.classList.remove('active'));
+  el.classList.add('active');
+  render();
+}
+
+// ── TASK CRUD ──────────────────────────────────────────────────────────
+function openAddTask(col) {
+  editingTaskId = null;
+  document.getElementById('taskModalTitle').textContent = 'Add Task';
+  document.getElementById('taskTitle').value = '';
+  document.getElementById('taskNote').value = '';
+  document.getElementById('taskColumn').value = col || 'primary';
+  document.getElementById('taskFocus').value = 'ETF/R';
+  document.getElementById('taskStatus').value = 'inflight';
+  openModal('taskModal');
+}
+
+async function openEditTask(id) {
+  const { data } = await sb.from('planner_tasks').select('*').eq('id', id).single();
+  if (!data) return;
+  editingTaskId = id;
+  document.getElementById('taskModalTitle').textContent = 'Edit Task';
+  document.getElementById('taskTitle').value = data.title;
+  document.getElementById('taskNote').value = data.note || '';
+  document.getElementById('taskColumn').value = data.column_name;
+  document.getElementById('taskFocus').value = data.focus_area;
+  document.getElementById('taskStatus').value = data.status;
+  openModal('taskModal');
+}
+
+async function saveTask() {
+  const title = document.getElementById('taskTitle').value.trim();
+  if (!title) { document.getElementById('taskTitle').focus(); return; }
+  const payload = {
+    workspace_id: workspaceId, week_start: currentWeekStart,
+    title, note: document.getElementById('taskNote').value.trim(),
+    column_name: document.getElementById('taskColumn').value,
+    focus_area: document.getElementById('taskFocus').value,
+    status: document.getElementById('taskStatus').value,
+    updated_at: new Date().toISOString()
+  };
+  if (editingTaskId) {
+    await sb.from('planner_tasks').update(payload).eq('id', editingTaskId);
+  } else {
+    await sb.from('planner_tasks').insert(payload);
+  }
+  closeModal('taskModal');
+  render();
+  toast('Task saved', 'success');
+}
+
+async function toggleDone(id, currentStatus) {
+  const newStatus = currentStatus === 'done' ? 'inflight' : 'done';
+  await sb.from('planner_tasks').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', id);
+  render();
+}
+
+async function deleteTask(id) {
+  if (!confirm('Delete this task?')) return;
+  await sb.from('planner_tasks').delete().eq('id', id);
+  render();
+}
+
+// ── WINS / BLOCKERS ────────────────────────────────────────────────────
+async function addWin() {
+  const w = prompt('What\'s the win?');
+  if (!w?.trim()) return;
+  await sb.from('planner_wins').insert({ workspace_id: workspaceId, week_start: currentWeekStart, text: w.trim() });
+  render();
+}
+async function deleteWin(id) {
+  await sb.from('planner_wins').delete().eq('id', id);
+  render();
+}
+async function addBlocker() {
+  const b = prompt('Describe the blocker:');
+  if (!b?.trim()) return;
+  await sb.from('planner_blockers').insert({ workspace_id: workspaceId, week_start: currentWeekStart, text: b.trim() });
+  render();
+}
+async function deleteBlocker(id) {
+  await sb.from('planner_blockers').delete().eq('id', id);
+  render();
+}
+
+// ── FOCUS ──────────────────────────────────────────────────────────────
+async function editFocus() {
+  const { data } = await sb.from('planner_weeks').select('focus').eq('workspace_id', workspaceId).eq('week_start', currentWeekStart).single();
+  document.getElementById('focusInput').value = (data?.focus || []).join(', ');
+  openModal('focusModal');
+}
+async function saveFocus() {
+  const focus = document.getElementById('focusInput').value.split(',').map(s=>s.trim()).filter(Boolean);
+  await sb.from('planner_weeks').upsert({ workspace_id: workspaceId, week_start: currentWeekStart, focus }, { onConflict: 'workspace_id,week_start' });
+  closeModal('focusModal');
+  render();
+}
+
+// ── COPY WEEK ──────────────────────────────────────────────────────────
+async function copyWeekForward() {
+  if (!confirm('Copy non-done tasks from this week to next week?')) return;
+  const { data: tasks } = await sb.from('planner_tasks').select('*').eq('workspace_id', workspaceId).eq('week_start', currentWeekStart).neq('status','done');
+  if (!tasks?.length) { toast('No in-progress tasks to copy', 'success'); return; }
+  const d = new Date(currentWeekStart + 'T00:00:00'); d.setDate(d.getDate()+7);
+  const nextWeek = getMondayOf(d);
+  const copies = tasks.map(t => ({ workspace_id: workspaceId, week_start: nextWeek, title: t.title, note: t.note, column_name: t.column_name, focus_area: t.focus_area, status: 'inflight', sort_order: t.sort_order }));
+  await sb.from('planner_tasks').insert(copies);
+  currentWeekStart = nextWeek;
+  render();
+  toast(`Copied ${copies.length} tasks to next week`, 'success');
+}
+
+// ── IMPORT ─────────────────────────────────────────────────────────────
+function openImportModal() {
+  document.getElementById('importText').value = '';
+  document.getElementById('importPreview').style.display = 'none';
+  document.getElementById('importConfirmBtn').style.display = 'none';
+  document.getElementById('importParseBtn').style.display = '';
+  importParsed = [];
+  openModal('importModal');
+}
+
+function guessArea(text) {
+  const t = text.toLowerCase();
+  if (/etf|etfr|vanguard|racf/.test(t)) return 'ETF/R';
+  if (/control.m|controlm|ioa|control.o/.test(t)) return 'Control-M';
+  if (/macro|freeze|insync|trace/.test(t)) return 'Macro4';
+  if (/smp|learn|study|read|train|msa/.test(t)) return 'Learning';
+  return 'Other';
+}
+
+function parseImport() {
+  const raw = document.getElementById('importText').value;
+  const lines = raw.split('\n').map(l=>l.trim()).filter(l=>l.length>3);
+  importParsed = lines.map((l,i) => ({
+    id: i, text: l.replace(/^[\*\-\•\d\.\)]+\s*/,'').trim(),
+    include: true, column: 'primary', focus: guessArea(l)
+  })).filter(x=>x.text.length>2);
+
+  if (!importParsed.length) { alert('No tasks found. Check the text has bullet or numbered lines.'); return; }
+
+  document.getElementById('importItems').innerHTML = importParsed.map(item => `
+    <div class="mini-item" id="imp_${item.id}" onclick="toggleImportItem(${item.id})" style="cursor:pointer;border-color:${item.include?'var(--blue)':'var(--border2)'}">
+      <div style="font-size:13px;width:18px;color:${item.include?'var(--green)':'var(--text-dim)'}" id="impchk_${item.id}">${item.include?'✓':'○'}</div>
+      <div style="flex:1;font-size:12px">${esc(item.text)}</div>
+      <select class="form-select" style="width:95px;font-size:10px;padding:2px 5px" onclick="event.stopPropagation()" onchange="setImportCol(${item.id},this.value)">
+        <option value="primary">Primary</option><option value="secondary">Secondary</option><option value="monitor">Monitor</option>
+      </select>
+      <select class="form-select" style="width:95px;font-size:10px;padding:2px 5px;margin-left:4px" onclick="event.stopPropagation()" onchange="setImportFocus(${item.id},this.value)">
+        <option value="ETF/R" ${item.focus==='ETF/R'?'selected':''}>ETF/R</option>
+        <option value="Control-M" ${item.focus==='Control-M'?'selected':''}>Control-M</option>
+        <option value="Macro4" ${item.focus==='Macro4'?'selected':''}>Macro4</option>
+        <option value="Learning" ${item.focus==='Learning'?'selected':''}>Learning</option>
+        <option value="Other" ${item.focus==='Other'?'selected':''}>Other</option>
+      </select>
+    </div>`).join('');
+
+  document.getElementById('importPreview').style.display = 'block';
+  document.getElementById('importParseBtn').style.display = 'none';
+  document.getElementById('importConfirmBtn').style.display = '';
+}
+
+function toggleImportItem(id) {
+  const item = importParsed.find(x=>x.id===id);
+  if (!item) return;
+  item.include = !item.include;
+  const el = document.getElementById('imp_'+id);
+  const chk = document.getElementById('impchk_'+id);
+  el.style.borderColor = item.include ? 'var(--blue)' : 'var(--border2)';
+  chk.style.color = item.include ? 'var(--green)' : 'var(--text-dim)';
+  chk.textContent = item.include ? '✓' : '○';
+}
+function setImportCol(id, val) { const i = importParsed.find(x=>x.id===id); if(i) i.column=val; }
+function setImportFocus(id, val) { const i = importParsed.find(x=>x.id===id); if(i) i.focus=val; }
+
+async function confirmImport() {
+  const rows = importParsed.filter(x=>x.include).map((item,idx) => ({
+    workspace_id: workspaceId, week_start: currentWeekStart,
+    title: item.text, note: '', column_name: item.column,
+    focus_area: item.focus, status: 'inflight', sort_order: idx
+  }));
+  if (!rows.length) return;
+  await sb.from('planner_tasks').insert(rows);
+  closeModal('importModal');
+  render();
+  toast(`Imported ${rows.length} tasks`, 'success');
+}
+
+// ── FINANCES ───────────────────────────────────────────────────────────
+async function loadFinances() {
+  if (!workspaceId) return;
+  const today = new Date();
+  const todayDay = today.getDate();
+
+  const [wsRes, billsRes, vacRes] = await Promise.all([
+    sb.from('workspaces').select('net_pay, vacation_goal').eq('id', workspaceId).single(),
+    sb.from('bills').select('name,amount,due_day,paid,cat').eq('workspace_id', workspaceId),
+    sb.from('vacation_log').select('paid_amt, paid').eq('workspace_id', workspaceId)
+  ]);
+
+  document.getElementById('finLoading').style.display = 'none';
+  document.getElementById('finContent').style.display = 'block';
+
+  const ws = wsRes.data || {};
+  const bills = billsRes.data || [];
+  const vacLog = vacRes.data || [];
+
+  // Summary
+  const totalBills = bills.reduce((s,b) => s + parseFloat(b.amount||0), 0);
+  const paidBills = bills.filter(b=>b.paid).reduce((s,b) => s + parseFloat(b.amount||0), 0);
+  const unpaidBills = totalBills - paidBills;
+  document.getElementById('finNetPay').textContent = fmt(ws.net_pay||0);
+  document.getElementById('finTotalBills').textContent = fmt(totalBills);
+  document.getElementById('finPaid').textContent = fmt(paidBills);
+  document.getElementById('finUnpaid').textContent = fmt(unpaidBills);
+
+  // Upcoming bills — next 14 days
+  const upcoming = bills
+    .filter(b => {
+      const diff = b.due_day >= todayDay ? b.due_day - todayDay : (31 - todayDay + b.due_day);
+      return diff <= 14;
+    })
+    .sort((a,b) => {
+      const da = a.due_day >= todayDay ? a.due_day - todayDay : 31 - todayDay + a.due_day;
+      const db = b.due_day >= todayDay ? b.due_day - todayDay : 31 - todayDay + b.due_day;
+      return da - db;
+    })
+    .slice(0, 8);
+
+  document.getElementById('billList').innerHTML = upcoming.length === 0
+    ? '<div class="empty-state">No bills in next 14 days</div>'
+    : upcoming.map(b => `
+      <div class="bill-row">
+        <div class="bill-name">${esc(b.name)}</div>
+        <div class="bill-amt">${fmt(b.amount)}</div>
+        <div class="bill-due">day ${b.due_day}</div>
+        <div class="bill-paid-dot ${b.paid?'dot-paid':'dot-unpaid'}" title="${b.paid?'Paid':'Unpaid'}"></div>
+      </div>`).join('');
+
+  // Vacation fund
+  const vacGoal = parseFloat(ws.vacation_goal || 5050);
+  const vacPaid = vacLog.filter(v=>v.paid).reduce((s,v) => s + parseFloat(v.paid_amt||0), 0);
+  const pct = Math.min(100, Math.round((vacPaid / vacGoal) * 100));
+  document.getElementById('vacPaid').textContent = `${fmt(vacPaid)} saved`;
+  document.getElementById('vacGoal').textContent = `Goal: ${fmt(vacGoal)}`;
+  document.getElementById('vacBar').style.width = pct + '%';
+  document.getElementById('vacPct').textContent = pct + '%';
+  document.getElementById('vacRemaining').textContent = `${fmt(Math.max(0, vacGoal - vacPaid))} to go`;
+}
+
+function fmt(n) { return '$' + parseFloat(n||0).toLocaleString('en-US', {minimumFractionDigits:0, maximumFractionDigits:0}); }
+
+// ── MODAL / TOAST ──────────────────────────────────────────────────────
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if(e.target===o) o.classList.remove('open'); }));
+
+function toast(msg, type='') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show ' + type;
+  setTimeout(() => el.className = 'toast', 2800);
+}
+</script>
+</body>
+</html>
