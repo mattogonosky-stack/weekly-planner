@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Hub</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #0a0d0c;
+    --panel: #121918;
+    --panel-2: #1a2321;
+    --border: #26302e;
+    --text: #dce4e2;
+    --text-muted: #7c8987;
+    --text-dim: #4a5654;
+    --amber: #f0b429;
+    --amber-dim: #2b2210;
+    --green: #4fd67a;
+    --green-dim: #0f2a1a;
+    --cyan: #57c7d4;
+    --cyan-dim: #102a2d;
+    --red: #e0605a;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  /* ---- console status line ---- */
+  .console-bar {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--text-dim);
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 24px;
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .console-bar span.hl { color: var(--green); }
+  .console-bar span.warn { color: var(--amber); }
+
+  main { max-width: 980px; margin: 0 auto; padding: 32px 24px 60px; }
+
+  .hub-title {
+    font-family: var(--mono);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+  .hub-sub {
+    font-size: 22px;
+    font-weight: 600;
+    margin-bottom: 28px;
+  }
+
+  /* ---- capture: command-line signature element ---- */
+  .capture {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 4px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+  .capture .prompt {
+    font-family: var(--mono);
+    color: var(--green);
+    padding: 0 4px 0 14px;
+    font-size: 15px;
+    user-select: none;
+  }
+  .capture textarea {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 14px;
+    padding: 12px 8px;
+    resize: none;
+    min-height: 24px;
+    max-height: 120px;
+  }
+  .capture textarea::placeholder { color: var(--text-dim); }
+  .capture select {
+    background: var(--panel-2);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-family: var(--sans);
+    font-size: 12px;
+    margin-right: 6px;
+  }
+  .capture button {
+    background: var(--green);
+    color: #08130d;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    margin-right: 6px;
+    white-space: nowrap;
+  }
+  .capture button:hover { filter: brightness(1.1); }
+
+  /* ---- unsorted tray ---- */
+  .unsorted {
+    display: none;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--red);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 28px;
+  }
+  .unsorted.show { display: block; }
+  .unsorted-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--red);
+    margin-bottom: 10px;
+  }
+  .unsorted-item { margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+  .unsorted-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .unsorted-text { font-size: 13px; margin-bottom: 4px; }
+  .unsorted-meta { font-size: 11px; color: var(--text-muted); margin-bottom: 8px; }
+  .sort-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .sort-group { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+  .sort-group .grp-label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; margin-right: 2px; }
+  .sort-btn {
+    font-family: var(--sans);
+    font-size: 11px;
+    padding: 4px 9px;
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    background: var(--panel-2);
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  .sort-btn:hover { color: var(--text); }
+  .sort-btn.work { border-color: var(--amber); }
+  .sort-btn.life { border-color: var(--green); }
+  .sort-btn.del { color: var(--red); border-color: transparent; margin-left: auto; }
+
+  /* ---- channel cards ---- */
+  .channels {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 32px;
+  }
+  .channel-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    text-decoration: none;
+    color: var(--text);
+    display: block;
+    transition: border-color 0.15s;
+  }
+  .channel-card:hover { border-color: var(--channel-color, var(--text-muted)); }
+  .channel-card.work { --channel-color: var(--amber); }
+  .channel-card.life { --channel-color: var(--green); }
+  .channel-card.family { --channel-color: var(--cyan); }
+  .channel-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--channel-color, var(--text-muted));
+    margin-bottom: 8px;
+  }
+  .channel-count { font-size: 26px; font-weight: 600; font-family: var(--mono); margin-bottom: 4px; }
+  .channel-desc { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; }
+  .channel-preview { font-size: 12px; color: var(--text-dim); border-top: 1px solid var(--border); padding-top: 8px; }
+  .channel-preview div { margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ---- life board ---- */
+  .section-label {
+    font-family: var(--mono);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-dim);
+    margin: 8px 0 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-label .rule { flex: 1; height: 1px; background: var(--border); }
+
+  .tabs { display: flex; gap: 4px; margin-bottom: 14px; }
+  .tab {
+    background: none; border: none; border-bottom: 2px solid transparent;
+    padding: 6px 4px; margin-right: 14px; color: var(--text-muted);
+    font-size: 13px; font-weight: 500; cursor: pointer;
+  }
+  .tab.active { color: var(--text); border-bottom-color: var(--green); }
+
+  .board {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+  }
+  .board-col { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .board-col-header {
+    padding: 9px 12px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 12px; font-weight: 600;
+  }
+  .board-col-header .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 7px; }
+  .dot-bmla { background: #a687e0; }
+  .dot-home { background: var(--green); }
+  .dot-family { background: var(--amber); }
+  .dot-dev { background: var(--red); }
+  .dot-other { background: var(--text-dim); }
+  .board-col-body { padding: 8px; min-height: 40px; }
+  .empty-mini { color: var(--text-dim); font-size: 11px; padding: 10px; text-align: center; }
+
+  .item {
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 7px;
+    padding: 9px 10px; margin-bottom: 7px;
+  }
+  .item.status-active { border-left: 3px solid var(--green); }
+  .item.status-done { opacity: 0.5; }
+  .item.status-done .item-content { text-decoration: line-through; }
+  .item-content { font-size: 12px; margin-bottom: 6px; word-wrap: break-word; }
+  .item-meta { font-size: 10px; color: var(--text-dim); margin-bottom: 7px; }
+  .item-actions { display: flex; gap: 5px; flex-wrap: wrap; }
+  .item-actions button {
+    font-family: var(--sans); font-size: 10px; padding: 3px 7px; border-radius: 4px;
+    border: 1px solid var(--border); background: var(--panel); color: var(--text-muted); cursor: pointer;
+  }
+  .item-actions button:hover { color: var(--text); }
+
+  .empty { color: var(--text-muted); font-size: 13px; padding: 20px; text-align: center; border: 1px dashed var(--border); border-radius: 8px; }
+
+  #authGate { max-width: 420px; margin: 100px auto; text-align: center; color: var(--text-muted); }
+  #authGate a { color: var(--amber); }
+
+  .toast {
+    position: fixed; bottom: 20px; right: 20px; background: var(--panel-2);
+    border: 1px solid var(--border); padding: 10px 16px; border-radius: 8px;
+    font-size: 13px; font-family: var(--mono); opacity: 0; transform: translateY(8px);
+    transition: all 0.2s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+
+  @media (max-width: 720px) {
+    .channels { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="console-bar" id="consoleBar">SYSTEM — loading…</div>
+
+<div id="authGate" style="display:none;">
+  Not signed in. <a href="./index.html">Sign in from the work planner</a> first, then come back here.
+</div>
+
+<main id="app" style="display:none;">
+  <div class="hub-title">Command Center</div>
+  <div class="hub-sub">Everything in one place.</div>
+
+  <div class="capture">
+    <span class="prompt">&gt;</span>
+    <textarea id="newContent" placeholder="Capture anything — work or personal — sort it after." rows="1"></textarea>
+    <select id="newSource">
+      <option value="manual">Typed</option>
+      <option value="siri">Siri</option>
+      <option value="alexa">Alexa+</option>
+    </select>
+    <button id="addBtn">Add</button>
+  </div>
+
+  <div class="unsorted" id="unsortedTray">
+    <div class="unsorted-title">Unsorted — pick a channel</div>
+    <div id="unsortedItems"></div>
+  </div>
+
+  <div class="channels">
+    <a href="./index.html" class="channel-card work">
+      <div class="channel-label">Work</div>
+      <div class="channel-count" id="workCount">–</div>
+      <div class="channel-desc">ETF/R · Control-M · Macro4 · Learning</div>
+      <div class="channel-preview" id="workPreview"></div>
+    </a>
+    <div class="channel-card life" style="cursor:default;">
+      <div class="channel-label">Life</div>
+      <div class="channel-count" id="lifeCount">–</div>
+      <div class="channel-desc">BMLA · Home · Family · Dev · Other</div>
+      <div class="channel-preview" id="lifePreview"></div>
+    </div>
+    <a href="./family.html" class="channel-card family">
+      <div class="channel-label">Family</div>
+      <div class="channel-count" id="familyCount">–</div>
+      <div class="channel-desc">Shift calendar for you &amp; Shannon</div>
+      <div class="channel-preview" id="familyPreview"></div>
+    </a>
+  </div>
+
+  <div style="display:flex; justify-content:flex-end; margin-bottom: 20px;">
+    <button id="syncCalBtn" style="background:var(--panel);border:1px solid var(--cyan);color:var(--cyan);border-radius:6px;padding:8px 14px;font-size:12px;font-family:var(--mono);cursor:pointer;">
+      ⟳ Sync Calendar
+    </button>
+  </div>
+
+  <div class="channels" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 32px;">
+    <div class="channel-card" style="--channel-color: var(--cyan); cursor:default;">
+      <div class="channel-label">Unpaid Bills</div>
+      <div class="channel-count" id="finUnpaid">–</div>
+      <div class="channel-desc" id="finUnpaidSub">next 14 days</div>
+    </div>
+    <div class="channel-card" style="--channel-color: var(--green); cursor:default;">
+      <div class="channel-label">Vacation Fund</div>
+      <div class="channel-count" id="finVacPct">–</div>
+      <div class="channel-desc" id="finVacSub"></div>
+    </div>
+    <div class="channel-card" style="--channel-color: var(--amber); cursor:default;">
+      <div class="channel-label">Net Pay</div>
+      <div class="channel-count" id="finNetPay">–</div>
+      <div class="channel-desc">per paycheck, on file</div>
+    </div>
+  </div>
+
+  <div class="unsorted" id="dueTray" style="border-left-color: var(--amber);">
+    <div class="unsorted-title" style="color: var(--amber);">Due soon</div>
+    <div id="dueItems"></div>
+  </div>
+
+  <div class="section-label"><span>LIFE BOARD</span><span class="rule"></span></div>
+  <div class="tabs">
+    <button class="tab active" data-tab="board">Board</button>
+    <button class="tab" data-tab="done">Done <span id="doneCount"></span></button>
+  </div>
+  <div id="boardView"><div class="board" id="board"></div></div>
+  <div id="doneView" style="display:none;"><div id="doneItems"></div></div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const SUPABASE_URL = "https://yiawbwwbhwdsqymjtrfu.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlpYXdid3diaHdkc3F5bWp0cmZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0NDYzMTQsImV4cCI6MjA5NTAyMjMxNH0._BAsgYTxjKFDaVQAM-6Ozp2fzA1IsvyFcjuS7Laj-3U";
+  const AUTH_TOKEN_KEY = "sb-yiawbwwbhwdsqymjtrfu-auth-token";
+
+  // Work categories map 1:1 onto planner_tasks.focus_area — a real fit,
+  // pushed immediately on sort. Life categories stay here and live out a
+  // full new/active/done lifecycle on the board below.
+  const WORK_CATS = [
+    { key: "etfr", label: "ETF/R", focus: "ETF/R" },
+    { key: "controlm", label: "Control-M", focus: "Control-M" },
+    { key: "macro4", label: "Macro4", focus: "Macro4" },
+    { key: "learning", label: "Learning", focus: "Learning" },
+  ];
+  const LIFE_CATS = [
+    { key: "bmla", label: "BMLA" },
+    { key: "home", label: "Home" },
+    { key: "family", label: "Family" },
+    { key: "dev", label: "Dev" },
+    { key: "other", label: "Other" },
+  ];
+
+  function daysUntil(dateStr) {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const d = new Date(dateStr + "T00:00:00");
+    return Math.round((d - today) / 86400000);
+  }
+  function dueLabel(dateStr) {
+    const n = daysUntil(dateStr);
+    if (n < 0) return { text: `${Math.abs(n)}d overdue`, cls: "var(--red)" };
+    if (n === 0) return { text: "Due today", cls: "var(--red)" };
+    if (n === 1) return { text: "Due tomorrow", cls: "var(--amber)" };
+    if (n <= 7) return { text: `Due in ${n}d`, cls: "var(--amber)" };
+    return { text: `Due ${dateStr}`, cls: "var(--text-muted)" };
+  }
+
+  function getToken() {
+    try { return JSON.parse(localStorage.getItem(AUTH_TOKEN_KEY) || "null")?.access_token || null; }
+    catch { return null; }
+  }
+  function getUserId() {
+    try { return JSON.parse(localStorage.getItem(AUTH_TOKEN_KEY) || "null")?.user?.id || null; }
+    catch { return null; }
+  }
+
+  async function dbFetch(path, options = {}) {
+    const token = getToken();
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+      ...options,
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        Prefer: options.prefer || "return=representation",
+        ...(options.headers || {}),
+      },
+    });
+    if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+    const text = await res.text();
+    return text ? JSON.parse(text) : null;
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 2200);
+  }
+
+  let workspaceId = null;
+  function getMondayOf(date) {
+    const d = new Date(date);
+    const day = d.getDay();
+    d.setDate(d.getDate() - day + (day === 0 ? -6 : 1));
+    return d.toISOString().split("T")[0];
+  }
+  async function resolveWorkspace() {
+    const uid = getUserId();
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/workspace_members?select=workspace_id,role&user_id=eq.${uid}`,
+      { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${getToken()}` } });
+    if (!res.ok) throw new Error(`workspace_members ${res.status}`);
+    const data = await res.json();
+    if (!data.length) throw new Error("No workspace found");
+    workspaceId = (data.find(r => r.role === "owner") || data[0]).workspace_id;
+  }
+
+  function timeAgo(iso) {
+    const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  }
+
+  let allItems = [];
+  let plannerTasks = [];
+
+  async function loadAll() {
+    const [items, tasks] = await Promise.all([
+      dbFetch("inbox_items?status=neq.archived&order=created_at.desc"),
+      workspaceId ? dbFetch(`planner_tasks?workspace_id=eq.${workspaceId}&week_start=eq.${getMondayOf(new Date())}&status=neq.done`) : Promise.resolve([]),
+    ]);
+    allItems = items || [];
+    plannerTasks = tasks || [];
+    render();
+  }
+
+  function render() {
+    // console bar
+    const unsorted = allItems.filter(i => !i.category && i.status !== "done");
+    const lifeActive = allItems.filter(i => LIFE_CATS.some(c => c.key === i.category) && i.status !== "done");
+    document.getElementById("consoleBar").innerHTML =
+      `SYSTEM — <span class="hl">${plannerTasks.length} active work tasks</span> · ` +
+      `<span class="hl">${lifeActive.length} active life items</span>` +
+      (unsorted.length ? ` · <span class="warn">${unsorted.length} unsorted</span>` : "");
+
+    // due-soon tray
+    const dueSoon = allItems
+      .filter(i => i.due_date && i.status !== "done" && daysUntil(i.due_date) <= 7)
+      .sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
+    const dueTray = document.getElementById("dueTray");
+    const dueWrap = document.getElementById("dueItems");
+    if (dueSoon.length) {
+      dueTray.classList.add("show");
+      dueWrap.innerHTML = "";
+      dueSoon.forEach(item => dueWrap.appendChild(renderDueItem(item)));
+    } else {
+      dueTray.classList.remove("show");
+    }
+
+    // unsorted tray
+    const tray = document.getElementById("unsortedTray");
+    const trayItems = document.getElementById("unsortedItems");
+    if (unsorted.length) {
+      tray.classList.add("show");
+      trayItems.innerHTML = "";
+      unsorted.forEach(item => trayItems.appendChild(renderUnsorted(item)));
+    } else {
+      tray.classList.remove("show");
+    }
+
+    // work channel card
+    document.getElementById("workCount").textContent = plannerTasks.length;
+    document.getElementById("workPreview").innerHTML = plannerTasks.slice(0, 3).map(t => `<div>${esc(t.title)}</div>`).join("") || "<div>Nothing active this week</div>";
+
+    // life channel card
+    document.getElementById("lifeCount").textContent = lifeActive.length;
+    document.getElementById("lifePreview").innerHTML = lifeActive.slice(0, 3).map(t => `<div>${esc(t.content)}</div>`).join("") || "<div>Nothing active</div>";
+
+    // life board
+    const board = document.getElementById("board");
+    board.innerHTML = "";
+    LIFE_CATS.forEach(cat => {
+      const items = allItems.filter(i => i.category === cat.key && i.status !== "done");
+      const col = document.createElement("div");
+      col.className = "board-col";
+      col.innerHTML = `<div class="board-col-header"><span><span class="dot dot-${cat.key}"></span>${cat.label}</span><span style="color:var(--text-muted);font-weight:400;">${items.length}</span></div><div class="board-col-body"></div>`;
+      const body = col.querySelector(".board-col-body");
+      if (!items.length) body.innerHTML = `<div class="empty-mini">Nothing here</div>`;
+      else items.forEach(item => body.appendChild(renderItem(item)));
+      board.appendChild(col);
+    });
+
+    // done tab
+    const done = allItems.filter(i => i.status === "done");
+    document.getElementById("doneCount").textContent = done.length ? `(${done.length})` : "";
+    const doneWrap = document.getElementById("doneItems");
+    doneWrap.innerHTML = "";
+    if (!done.length) doneWrap.innerHTML = `<div class="empty">Nothing done yet.</div>`;
+    else done.forEach(item => doneWrap.appendChild(renderItem(item, { done: true })));
+  }
+
+  function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+
+  function renderUnsorted(item) {
+    const el = document.createElement("div");
+    el.className = "unsorted-item";
+    el.innerHTML = `
+      <div class="unsorted-text"></div>
+      <div class="unsorted-meta">via ${item.source} · ${timeAgo(item.created_at)}</div>
+      <div class="sort-row">
+        <div class="sort-group"><span class="grp-label">Work</span></div>
+        <div class="sort-group"><span class="grp-label">Life</span></div>
+      </div>
+    `;
+    el.querySelector(".unsorted-text").textContent = item.content;
+    const [workGrp, lifeGrp] = el.querySelectorAll(".sort-group");
+    WORK_CATS.forEach(cat => {
+      const btn = document.createElement("button");
+      btn.className = "sort-btn work";
+      btn.textContent = cat.label;
+      btn.onclick = () => sortToWork(item, cat);
+      workGrp.appendChild(btn);
+    });
+    LIFE_CATS.forEach(cat => {
+      const btn = document.createElement("button");
+      btn.className = "sort-btn life";
+      btn.textContent = cat.label;
+      btn.onclick = () => sortToLife(item, cat.key);
+      lifeGrp.appendChild(btn);
+    });
+    const delBtn = document.createElement("button");
+    delBtn.className = "sort-btn del";
+    delBtn.textContent = "Delete";
+    delBtn.onclick = () => deleteItem(item.id);
+    el.querySelector(".sort-row").appendChild(delBtn);
+    return el;
+  }
+
+  function renderDueItem(item) {
+    const el = document.createElement("div");
+    el.className = "unsorted-item";
+    const due = dueLabel(item.due_date);
+    el.innerHTML = `
+      <div class="unsorted-text"></div>
+      <div class="unsorted-meta" style="color:${due.cls}">${due.text} &middot; ${item.category ? item.category : "uncategorized"}</div>
+    `;
+    el.querySelector(".unsorted-text").textContent = item.content;
+    return el;
+  }
+
+  function renderItem(item, opts = {}) {
+    const el = document.createElement("div");
+    el.className = `item status-${item.status}`;
+    const dueBadge = item.due_date && item.status !== "done"
+      ? `<span style="color:${dueLabel(item.due_date).cls}">${dueLabel(item.due_date).text}</span> · `
+      : "";
+    el.innerHTML = `<div class="item-content"></div><div class="item-meta">${dueBadge}via ${item.source} · ${timeAgo(item.created_at)}</div><div class="item-actions"></div>`;
+    el.querySelector(".item-content").textContent = item.content;
+    const actions = el.querySelector(".item-actions");
+    if (!opts.done) {
+      const dateInput = document.createElement("input");
+      dateInput.type = "date";
+      dateInput.value = item.due_date || "";
+      dateInput.title = "Set due date";
+      dateInput.style.cssText = "font-family:var(--sans);font-size:10px;padding:2px 4px;border-radius:4px;border:1px solid var(--border);background:var(--panel);color:var(--text-muted);";
+      dateInput.onchange = () => setDueDate(item.id, dateInput.value || null);
+      actions.appendChild(dateInput);
+    }
+    if (opts.done) {
+      const btn = document.createElement("button");
+      btn.textContent = "Reopen";
+      btn.onclick = () => setStatus(item.id, "new");
+      actions.appendChild(btn);
+    } else {
+      if (item.status !== "active") {
+        const btn = document.createElement("button");
+        btn.textContent = "Start";
+        btn.onclick = () => setStatus(item.id, "active");
+        actions.appendChild(btn);
+      }
+      const doneBtn = document.createElement("button");
+      doneBtn.textContent = "✓ Done";
+      doneBtn.onclick = () => setStatus(item.id, "done");
+      actions.appendChild(doneBtn);
+    }
+    const delBtn = document.createElement("button");
+    delBtn.textContent = "Delete";
+    delBtn.onclick = () => deleteItem(item.id);
+    actions.appendChild(delBtn);
+    return el;
+  }
+
+  async function addItem() {
+    const content = document.getElementById("newContent").value.trim();
+    if (!content) return;
+    const source = document.getElementById("newSource").value;
+    await dbFetch("inbox_items", { method: "POST", body: JSON.stringify({ content, source, created_by: getUserId() }) });
+    document.getElementById("newContent").value = "";
+    showToast("Captured — sort it above");
+    loadAll();
+  }
+
+  async function sortToLife(item, category) {
+    await dbFetch(`inbox_items?id=eq.${item.id}`, { method: "PATCH", body: JSON.stringify({ category }) });
+    showToast(`Sorted into ${category}`);
+    loadAll();
+  }
+
+  async function sortToWork(item, cat) {
+    if (!workspaceId) { showToast("Workspace not resolved — reload and try again"); return; }
+    try {
+      await dbFetch("planner_tasks", {
+        method: "POST",
+        prefer: "return=minimal",
+        body: JSON.stringify({
+          workspace_id: workspaceId,
+          week_start: getMondayOf(new Date()),
+          title: item.content.slice(0, 500),
+          note: `From Hub — captured via ${item.source}`,
+          column_name: "secondary",
+          focus_area: cat.focus,
+          status: "inflight",
+          updated_at: new Date().toISOString(),
+        }),
+      });
+      await dbFetch(`inbox_items?id=eq.${item.id}`, { method: "PATCH", body: JSON.stringify({ category: cat.key, status: "done" }) });
+      showToast(`Pushed to Work: ${cat.label}`);
+      loadAll();
+    } catch (e) {
+      console.error(e);
+      showToast("Couldn't push to planner — see console");
+    }
+  }
+
+  async function setDueDate(id, due_date) {
+    await dbFetch(`inbox_items?id=eq.${id}`, { method: "PATCH", body: JSON.stringify({ due_date }) });
+    showToast(due_date ? `Due date set` : "Due date cleared");
+    loadAll();
+  }
+
+  async function setStatus(id, status) {
+    await dbFetch(`inbox_items?id=eq.${id}`, { method: "PATCH", body: JSON.stringify({ status, actioned_at: status === "done" ? new Date().toISOString() : null }) });
+    loadAll();
+  }
+  async function deleteItem(id) {
+    await dbFetch(`inbox_items?id=eq.${id}`, { method: "DELETE", prefer: "return=minimal" });
+    showToast("Deleted");
+    loadAll();
+  }
+
+  function fmt(n) { return "$" + parseFloat(n || 0).toLocaleString("en-US", { maximumFractionDigits: 0 }); }
+
+  async function loadFinances() {
+    if (!workspaceId) return;
+    try {
+      const [wsArr, bills, vacLog] = await Promise.all([
+        dbFetch(`workspaces?id=eq.${workspaceId}&select=net_pay,vacation_goal`),
+        dbFetch(`bills?workspace_id=eq.${workspaceId}&select=amount,due_day,paid`),
+        dbFetch(`vacation_log?workspace_id=eq.${workspaceId}&select=paid_amt,paid`),
+      ]);
+      const ws = wsArr?.[0] || {};
+      const todayDay = new Date().getDate();
+      const upcomingUnpaid = (bills || []).filter(b => {
+        if (b.paid) return false;
+        const diff = b.due_day >= todayDay ? b.due_day - todayDay : (31 - todayDay + b.due_day);
+        return diff <= 14;
+      });
+      const upcomingTotal = upcomingUnpaid.reduce((s, b) => s + parseFloat(b.amount || 0), 0);
+      document.getElementById("finUnpaid").textContent = fmt(upcomingTotal);
+      document.getElementById("finUnpaidSub").textContent = `${upcomingUnpaid.length} bill${upcomingUnpaid.length === 1 ? "" : "s"}, next 14 days`;
+
+      const vacGoal = parseFloat(ws.vacation_goal || 0);
+      const vacPaid = (vacLog || []).filter(v => v.paid).reduce((s, v) => s + parseFloat(v.paid_amt || 0), 0);
+      const pct = vacGoal ? Math.min(100, Math.round((vacPaid / vacGoal) * 100)) : 0;
+      document.getElementById("finVacPct").textContent = pct + "%";
+      document.getElementById("finVacSub").textContent = `${fmt(vacPaid)} of ${fmt(vacGoal)}`;
+
+      document.getElementById("finNetPay").textContent = fmt(ws.net_pay || 0);
+    } catch (e) {
+      console.error("Finance load failed", e);
+    }
+  }
+
+  // Family Schedule stores each person's whole schedule as one JSON blob
+  // keyed by date. Pull both, find the next upcoming entries from today,
+  // and surface them here instead of a bare link.
+  async function loadFamilyPreview() {
+    try {
+      const rows = await dbFetch("schedules?select=person,data");
+      const today = new Date(); today.setHours(0,0,0,0);
+      const upcoming = [];
+      (rows || []).forEach(row => {
+        const sched = row.data?.schedule || {};
+        Object.keys(sched).forEach(dateStr => {
+          const d = new Date(dateStr + "T00:00:00");
+          if (d >= today) {
+            sched[dateStr].forEach(entry => {
+              upcoming.push({ person: row.person, date: dateStr, type: entry.type, startTime: entry.startTime });
+            });
+          }
+        });
+      });
+      upcoming.sort((a, b) => new Date(a.date) - new Date(b.date));
+      document.getElementById("familyCount").textContent = upcoming.length;
+      const preview = upcoming.slice(0, 3).map(u => {
+        const label = u.person.charAt(0).toUpperCase() + u.person.slice(1);
+        const when = u.startTime ? `${u.date} ${u.startTime}` : u.date;
+        return `<div>${label}: ${u.type} — ${when}</div>`;
+      }).join("");
+      document.getElementById("familyPreview").innerHTML = preview || "<div>Nothing scheduled ahead</div>";
+    } catch (e) {
+      console.error("Family preview failed", e);
+      document.getElementById("familyPreview").innerHTML = "<div>Preview unavailable</div>";
+    }
+  }
+
+  const SYNC_URL = "https://yiawbwwbhwdsqymjtrfu.supabase.co/functions/v1/sync-calendar";
+  const SYNC_SECRET = "ox6A55xkvfPJqd8j2TNBLGNI8ffWzzqJ";
+
+  async function syncCalendar() {
+    const btn = document.getElementById("syncCalBtn");
+    btn.disabled = true;
+    btn.textContent = "⟳ Syncing…";
+    try {
+      const res = await fetch(SYNC_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-sync-secret": SYNC_SECRET },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || res.status);
+      showToast(`Synced: ${data.added} new, ${data.skipped} already had it`);
+      loadAll();
+      loadFamilyPreview();
+    } catch (e) {
+      console.error(e);
+      showToast("Sync failed — see console");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "⟳ Sync Calendar";
+    }
+  }
+
+  document.getElementById("syncCalBtn").addEventListener("click", syncCalendar);
+  document.getElementById("addBtn").addEventListener("click", addItem);
+  document.getElementById("newContent").addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); addItem(); }
+  });
+  document.querySelectorAll(".tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+      const isDone = tab.dataset.tab === "done";
+      document.getElementById("boardView").style.display = isDone ? "none" : "block";
+      document.getElementById("doneView").style.display = isDone ? "block" : "none";
+    });
+  });
+
+  (function init() {
+    if (!getToken()) { document.getElementById("authGate").style.display = "block"; return; }
+    document.getElementById("app").style.display = "block";
+    resolveWorkspace().then(() => { loadAll(); loadFinances(); }).catch(e => {
+      console.error(e);
+      showToast("Workspace resolution failed — some features limited");
+      loadAll();
+    });
+    loadFamilyPreview();
+  })();
+</script>
+
+</body>
+</html>
