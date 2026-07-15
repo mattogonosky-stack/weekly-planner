@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Life Hub</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --panel-2: #1e222b;
+    --border: #2a2f3a;
+    --text: #e8e9ed;
+    --text-muted: #8b909c;
+    --yellow: #e8b339;
+    --green: #4caf7d;
+    --red: #e0605a;
+    --blue: #5b9dd9;
+    --purple: #a687e0;
+    --gray: #6b7280;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    min-height: 100vh;
+  }
+  header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  header h1 { font-size: 18px; margin: 0; font-weight: 600; }
+  header .sub { color: var(--text-muted); font-size: 13px; margin-top: 2px; }
+  header nav a {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 13px;
+    margin-left: 16px;
+    border-bottom: 1px solid transparent;
+  }
+  header nav a:hover { color: var(--text); border-bottom-color: var(--text-muted); }
+
+  main { max-width: 1080px; margin: 0 auto; padding: 24px; }
+
+  #authGate {
+    max-width: 420px;
+    margin: 80px auto;
+    text-align: center;
+    color: var(--text-muted);
+  }
+  #authGate a { color: var(--blue); }
+
+  .capture {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 20px;
+  }
+  .capture textarea {
+    width: 100%;
+    min-height: 56px;
+    resize: vertical;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 10px 12px;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  .capture-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  select, button {
+    font-family: inherit;
+    font-size: 13px;
+  }
+  select {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 7px 10px;
+  }
+  button {
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--panel-2);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 7px 12px;
+    transition: background 0.15s;
+  }
+  button:hover { background: #262b36; }
+  button.primary {
+    background: var(--yellow);
+    color: #1a1a1a;
+    border-color: var(--yellow);
+    font-weight: 600;
+    margin-left: auto;
+  }
+  button.primary:hover { filter: brightness(1.08); }
+
+  .uncategorized-banner {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--gray);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 24px;
+    display: none;
+  }
+  .uncategorized-banner.show { display: block; }
+  .uncategorized-banner .banner-title {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--text-muted);
+  }
+
+  .tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .tab {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 8px 4px;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 0;
+    margin-right: 8px;
+  }
+  .tab:hover { background: none; color: var(--text); }
+  .tab.active { color: var(--text); border-bottom-color: var(--blue); }
+  .tab .count { color: var(--text-dim, var(--text-muted)); font-size: 11px; margin-left: 4px; }
+
+  .board {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+  }
+  .board-col {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .board-col-header {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .board-col-header .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+  .board-col-body { padding: 10px; min-height: 60px; }
+  .board-col-body .empty-mini {
+    color: var(--text-muted);
+    font-size: 12px;
+    padding: 12px;
+    text-align: center;
+  }
+
+  .dot-bmla { background: var(--purple); }
+  .dot-msa1 { background: var(--blue); }
+  .dot-home { background: var(--green); }
+  .dot-family { background: var(--yellow); }
+  .dot-dev { background: var(--red); }
+  .dot-other { background: var(--gray); }
+
+  .item {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+  }
+  .item-content { font-size: 13px; line-height: 1.4; word-wrap: break-word; margin-bottom: 6px; }
+  .item-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    text-transform: capitalize;
+  }
+  .item-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .item-actions button { padding: 4px 8px; font-size: 11px; }
+  .item-actions button.active-btn { border-color: var(--blue); color: var(--blue); }
+  .item-actions button.done-btn { border-color: var(--green); color: var(--green); }
+  .item.status-active { border-left: 3px solid var(--blue); }
+  .item.status-done { opacity: 0.55; }
+  .item.status-done .item-content { text-decoration: line-through; }
+
+  .cat-pick {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+  }
+  .cat-pick button { font-size: 11px; padding: 4px 9px; }
+
+  .empty {
+    color: var(--text-muted);
+    font-size: 13px;
+    padding: 24px;
+    text-align: center;
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: all 0.2s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Life Hub</h1>
+    <div class="sub">Everything that isn't work — BMLA, home, family, dev — captured, sorted, and tracked here.</div>
+  </div>
+  <nav><a href="./index.html">&larr; Work planner</a></nav>
+</header>
+
+<main>
+  <div id="authGate" style="display:none;">
+    Not signed in. <a href="./index.html">Sign in from the work planner</a> first, then come back to this page.
+  </div>
+
+  <div id="app" style="display:none;">
+    <div class="capture">
+      <textarea id="newContent" placeholder="What's on your mind? Sort it into a category later — just get it down now."></textarea>
+      <div class="capture-row">
+        <select id="newSource">
+          <option value="manual">Typed now</option>
+          <option value="siri">From Siri</option>
+          <option value="alexa">From Alexa+</option>
+        </select>
+        <button class="primary" id="addBtn">Add to Life Hub</button>
+      </div>
+    </div>
+
+    <div class="uncategorized-banner" id="uncatBanner">
+      <div class="banner-title">Needs a category</div>
+      <div id="uncatItems"></div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="board">Board</button>
+      <button class="tab" data-tab="done">Done <span class="count" id="doneCount"></span></button>
+    </div>
+
+    <div id="boardView">
+      <div class="board" id="board"></div>
+    </div>
+
+    <div id="doneView" style="display:none;">
+      <div id="doneItems"></div>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ---- Same auth workaround as the work planner: the Supabase JS client's
+  // getSession() hangs on GitHub Pages due to multi-instance GoTrueClient
+  // conflicts, so we read the token straight from localStorage and hit the
+  // REST API directly with fetch(). ----
+
+  const SUPABASE_URL = "https://yiawbwwbhwdsqymjtrfu.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlpYXdid3diaHdkc3F5bWp0cmZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0NDYzMTQsImV4cCI6MjA5NTAyMjMxNH0._BAsgYTxjKFDaVQAM-6Ozp2fzA1IsvyFcjuS7Laj-3U";
+  const AUTH_TOKEN_KEY = "sb-yiawbwwbhwdsqymjtrfu-auth-token";
+
+  const CATEGORIES = [
+    { key: "bmla", label: "BMLA" },
+    { key: "msa1", label: "MSA1 / Work" },
+    { key: "home", label: "Home" },
+    { key: "family", label: "Family" },
+    { key: "dev", label: "Dev" },
+    { key: "other", label: "Other" },
+  ];
+
+  function getToken() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(AUTH_TOKEN_KEY) || "null");
+      return parsed?.access_token || null;
+    } catch { return null; }
+  }
+  function getUserId() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(AUTH_TOKEN_KEY) || "null");
+      return parsed?.user?.id || null;
+    } catch { return null; }
+  }
+
+  async function dbFetch(path, options = {}) {
+    const token = getToken();
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+      ...options,
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        Prefer: options.prefer || "return=representation",
+        ...(options.headers || {}),
+      },
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`${res.status}: ${text}`);
+    }
+    const text = await res.text();
+    return text ? JSON.parse(text) : null;
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 2200);
+  }
+
+  let workspaceId = null;
+
+  function getMondayOf(date) {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    d.setDate(diff);
+    return d.toISOString().split("T")[0];
+  }
+
+  async function resolveWorkspace() {
+    const uid = getUserId();
+    const token = getToken();
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/workspace_members?select=workspace_id,role&user_id=eq.${uid}`,
+      { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` } }
+    );
+    if (!res.ok) throw new Error(`workspace_members ${res.status}`);
+    const data = await res.json();
+    if (!data.length) throw new Error("No workspace found for this user");
+    const owned = data.find((r) => r.role === "owner");
+    workspaceId = (owned || data[0]).workspace_id;
+  }
+
+  function catLabel(cat) {
+    return CATEGORIES.find((c) => c.key === cat)?.label || "Uncategorized";
+  }
+
+  function timeAgo(iso) {
+    const diff = Date.now() - new Date(iso).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  }
+
+  let allItems = [];
+
+  async function loadItems() {
+    allItems = await dbFetch("inbox_items?status=neq.archived&order=created_at.desc") || [];
+    render();
+  }
+
+  function render() {
+    const uncategorized = allItems.filter((i) => !i.category && i.status !== "done");
+    const banner = document.getElementById("uncatBanner");
+    const uncatWrap = document.getElementById("uncatItems");
+    if (uncategorized.length) {
+      banner.classList.add("show");
+      uncatWrap.innerHTML = "";
+      uncategorized.forEach((item) => uncatWrap.appendChild(renderUncategorized(item)));
+    } else {
+      banner.classList.remove("show");
+    }
+
+    const board = document.getElementById("board");
+    board.innerHTML = "";
+    CATEGORIES.forEach((cat) => {
+      const items = allItems.filter((i) => i.category === cat.key && i.status !== "done");
+      const col = document.createElement("div");
+      col.className = "board-col";
+      col.innerHTML = `
+        <div class="board-col-header">
+          <span><span class="dot dot-${cat.key}"></span>${cat.label}</span>
+          <span style="color:var(--text-muted);font-weight:400;">${items.length}</span>
+        </div>
+        <div class="board-col-body"></div>
+      `;
+      const body = col.querySelector(".board-col-body");
+      if (!items.length) {
+        body.innerHTML = `<div class="empty-mini">Nothing here</div>`;
+      } else {
+        items.forEach((item) => body.appendChild(renderItem(item)));
+      }
+      board.appendChild(col);
+    });
+
+    const doneItems = allItems.filter((i) => i.status === "done");
+    document.getElementById("doneCount").textContent = doneItems.length ? `(${doneItems.length})` : "";
+    const doneWrap = document.getElementById("doneItems");
+    doneWrap.innerHTML = "";
+    if (!doneItems.length) {
+      doneWrap.innerHTML = `<div class="empty">Nothing marked done yet.</div>`;
+    } else {
+      doneItems.forEach((item) => doneWrap.appendChild(renderItem(item, { done: true })));
+    }
+  }
+
+  function renderUncategorized(item) {
+    const el = document.createElement("div");
+    el.className = "item";
+    el.innerHTML = `
+      <div class="item-content"></div>
+      <div class="item-meta"><span>via ${item.source}</span><span>&middot; ${timeAgo(item.created_at)}</span></div>
+      <div class="cat-pick"></div>
+    `;
+    el.querySelector(".item-content").textContent = item.content;
+    const pick = el.querySelector(".cat-pick");
+    CATEGORIES.forEach((cat) => {
+      const btn = document.createElement("button");
+      btn.textContent = cat.label;
+      btn.onclick = () => setCategory(item.id, cat.key);
+      pick.appendChild(btn);
+    });
+    const delBtn = document.createElement("button");
+    delBtn.textContent = "Delete";
+    delBtn.onclick = () => deleteItem(item.id);
+    pick.appendChild(delBtn);
+    return el;
+  }
+
+  function renderItem(item, opts = {}) {
+    const el = document.createElement("div");
+    el.className = `item status-${item.status}`;
+    el.innerHTML = `
+      <div class="item-content"></div>
+      <div class="item-meta"><span>via ${item.source}</span><span>&middot; ${timeAgo(item.created_at)}</span></div>
+      <div class="item-actions"></div>
+    `;
+    el.querySelector(".item-content").textContent = item.content;
+    const actions = el.querySelector(".item-actions");
+
+    if (opts.done) {
+      const reopenBtn = document.createElement("button");
+      reopenBtn.textContent = "Reopen";
+      reopenBtn.onclick = () => setStatus(item.id, "new");
+      actions.appendChild(reopenBtn);
+    } else {
+      if (item.status !== "active") {
+        const activeBtn = document.createElement("button");
+        activeBtn.textContent = "Start";
+        activeBtn.className = "active-btn";
+        activeBtn.onclick = () => setStatus(item.id, "active");
+        actions.appendChild(activeBtn);
+      }
+      if (item.category === "msa1") {
+        const pushBtn = document.createElement("button");
+        pushBtn.textContent = "→ Planner";
+        pushBtn.onclick = () => pushToPlanner(item);
+        actions.appendChild(pushBtn);
+      }
+      const doneBtn = document.createElement("button");
+      doneBtn.textContent = "✓ Done";
+      doneBtn.className = "done-btn";
+      doneBtn.onclick = () => setStatus(item.id, "done");
+      actions.appendChild(doneBtn);
+    }
+    const delBtn = document.createElement("button");
+    delBtn.textContent = "Delete";
+    delBtn.onclick = () => deleteItem(item.id);
+    actions.appendChild(delBtn);
+
+    return el;
+  }
+
+  async function addItem() {
+    const content = document.getElementById("newContent").value.trim();
+    if (!content) return;
+    const source = document.getElementById("newSource").value;
+
+    await dbFetch("inbox_items", {
+      method: "POST",
+      body: JSON.stringify({ content, source, created_by: getUserId() }),
+    });
+
+    document.getElementById("newContent").value = "";
+    showToast("Added — sort it below when you're ready");
+    loadItems();
+  }
+
+  async function setCategory(id, category) {
+    await dbFetch(`inbox_items?id=eq.${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ category }),
+    });
+    showToast(`Sorted into ${catLabel(category)}`);
+    loadItems();
+  }
+
+  async function setStatus(id, status) {
+    await dbFetch(`inbox_items?id=eq.${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status, actioned_at: status === "done" ? new Date().toISOString() : null }),
+    });
+    loadItems();
+  }
+
+  async function deleteItem(id) {
+    await dbFetch(`inbox_items?id=eq.${id}`, { method: "DELETE", prefer: "return=minimal" });
+    showToast("Deleted");
+    loadItems();
+  }
+
+  async function pushToPlanner(item) {
+    if (!workspaceId) {
+      showToast("Can't push yet — workspace not resolved. Try reloading.");
+      return;
+    }
+    const payload = {
+      workspace_id: workspaceId,
+      week_start: getMondayOf(new Date()),
+      title: item.content.slice(0, 500),
+      note: `From Life Hub — captured via ${item.source}`,
+      column_name: "secondary",
+      focus_area: "Learning",
+      status: "inflight",
+      updated_at: new Date().toISOString(),
+    };
+    try {
+      await dbFetch("planner_tasks", { method: "POST", body: JSON.stringify(payload), prefer: "return=minimal" });
+      await setStatus(item.id, "done");
+      showToast("Pushed to work planner");
+    } catch (e) {
+      console.error(e);
+      showToast("Couldn't push to planner — see console");
+    }
+  }
+
+  document.getElementById("addBtn").addEventListener("click", addItem);
+  document.querySelectorAll(".tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+      tab.classList.add("active");
+      const isDone = tab.dataset.tab === "done";
+      document.getElementById("boardView").style.display = isDone ? "none" : "block";
+      document.getElementById("doneView").style.display = isDone ? "block" : "none";
+    });
+  });
+
+  (function init() {
+    if (!getToken()) {
+      document.getElementById("authGate").style.display = "block";
+      return;
+    }
+    document.getElementById("app").style.display = "block";
+    resolveWorkspace().catch((e) => {
+      console.error(e);
+      showToast("Couldn't resolve workspace — push-to-planner will fail until reload");
+    });
+    loadItems().catch((e) => {
+      console.error(e);
+      showToast("Couldn't load Life Hub — check console");
+    });
+  })();
+</script>
+
+</body>
+</html>
